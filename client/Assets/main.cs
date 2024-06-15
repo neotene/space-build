@@ -16,7 +16,7 @@ public class Connection : MonoBehaviour
 
     websocket.OnOpen += () =>
     {
-      Debug.Log("Connection open!");
+    //   Debug.Log("Connection open!");
     };
 
     websocket.OnError += (e) =>
@@ -31,16 +31,16 @@ public class Connection : MonoBehaviour
 
     websocket.OnMessage += (bytes) =>
     {
-      Debug.Log("OnMessage!");
-      Debug.Log(bytes);
+    //   Debug.Log("OnMessage!");
+    //   Debug.Log(bytes);
 
       // getting the message as a string
-      // var message = System.Text.Encoding.UTF8.GetString(bytes);
-      // Debug.Log("OnMessage! " + message);
+      var message = System.Text.Encoding.UTF8.GetString(bytes);
+      Debug.Log("OnMessage! " + message);
     };
 
     // Keep sending messages at every 0.3s
-    InvokeRepeating("SendWebSocketMessage", 0.0f, 0.3f);
+    // InvokeRepeating("SendWebSocketMessage", 0.0f, 0.3f);
 
     // waiting for messages
     await websocket.Connect();
