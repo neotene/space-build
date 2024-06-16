@@ -1,33 +1,43 @@
+use std::str::FromStr;
+
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
+use serde::{Deserialize, Serialize}; // Importer Serialize et Deserialize de serde
+                                     // use serde_json::Result;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
-use tokio_tungstenite::tungstenite::protocol::Message;
-use futures::stream::StreamExt;
-use futures::sink::SinkExt;
-use serde::{Serialize, Deserialize}; // Importer Serialize et Deserialize de serde
-use serde_json::Result; // Importer Result de serde_json
+use tokio_tungstenite::tungstenite::protocol::Message; // Importer Result de serde_json
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Block
-{
+pub enum Block {
     Tile(TileBlock),
-    Table(TableBlock)
+    Table(TableBlock),
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct TileBlock {
+    color: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct TableBlock {}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Coords {
+    x: usize,
+    y: usize,
+    z: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TileBlock
-{
-    color: u32
+pub struct BlockData {
+    block_type: String,
+    block_coords: Coords,
+    block_json: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TableBlock
-{
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Data
-{
-    blocks: Vec<Block>
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Data {
+    blocks: Vec<BlockData>,
 }
 
 #[tokio::main]
@@ -49,42 +59,51 @@ async fn main() {
 
             let (mut write, mut read) = ws_stream.split();
 
-            // let mut my_vec: Vec<u8> = Vec::new();
-            // my_vec.push(42);
+            let mut blocks = Vec::new();
 
-            let mut data = Data::new();
+            let mut i = 0;
 
-            let tile1 = TileBlock {
-                color: 0xffffffff
-            };
+            while i < 100 {
+                blocks.push(Block::Tile(TileBlock { color: 0xffffffff }));
+                i = i + 1
+            }
 
-            data.blocks.push(Block::Tile(tile1));
-            
+            let mut data = Data::default();
 
-            let result = serde_json::to_string_pretty(&data);
+            i = 0;
+            while i < blocks.len() {
+                match &blocks[i] {
+                    Block::Table(table) => data.blocks.push(BlockData {
+                        block_type: String::from_str("table").unwrap(),
+                        block_json: serde_json::to_string(&table).unwrap(),
+                        block_coords: Coords { x: i, y: 0, z: 0 },
+                    }),
+                    Block::Tile(tile) => data.blocks.push(BlockData {
+                        block_type: String::from_str("tile").unwrap(),
+                        block_json: serde_json::to_string(&tile).unwrap(),
+                        block_coords: Coords { x: i, y: 0, z: 0 },
+                    }),
+                }
+                i = i + 1;
+            }
 
-            match result {
+            let data_json = serde_json::to_string(&data);
+
+            match data_json {
                 Ok(serialized) => {
                     println!("Serialized blocks:");
                     println!("{}", serialized);
 
-                    write.send(Message::Text(serialized)).await.expect("Failed to send message");
+                    write
+                        .send(Message::Text(serialized))
+                        .await
+                        .expect("Failed to send message");
                 }
                 Err(err) => {
                     eprintln!("Failed to serialize blocks: {}", err);
-                    // Autres actions en cas d'erreur, comme retourner une erreur ou quitter
-                    // std::process::exit(1); // Exemple : quitter le programme avec un code d'erreur
                 }
             }
 
-            // write.send(Message::Binary(blocks)).await.expect("Failed to send map");
-
-
-            // write.send(Message::Text("hello".to_string()))
-            //     .await
-            //     .expect("Failed to send message");
-
-            // Optional: Handle incoming messages from the client
             while let Some(Ok(msg)) = read.next().await {
                 println!("Received a message from client: {:?}", msg);
             }
