@@ -6,10 +6,17 @@ using UnityEngine;
 using NativeWebSocket;
 
 [Serializable]
+public class TileBlock
+{
+    public int color;
+}
+
+[Serializable]
 public class BlockData
 {
     public String block_type;
     public String block_json;
+    public Vector3 block_coords;
 }
 
 [Serializable]
@@ -60,7 +67,13 @@ public class Connection : MonoBehaviour
 
             foreach (BlockData blockData in data.blocks)
             {
-                Debug.Log(blockData.block_type);
+                if (blockData.block_type == "tile")
+                {
+                    TileBlock tileBlock = new TileBlock();
+                    tileBlock = JsonUtility.FromJson<TileBlock>(blockData.block_json);
+
+                    Instantiate(TilePrefab, blockData.block_coords * 10, Quaternion.identity);
+                }
             }
 
         };
