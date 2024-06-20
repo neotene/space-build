@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::path::Path;
 use std::str::FromStr;
 
 use futures::sink::SinkExt;
@@ -7,6 +9,12 @@ use serde::{Deserialize, Serialize}; // Importer Serialize et Deserialize de ser
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::protocol::Message; // Importer Result de serde_json
+
+// extern crate rusqlite;
+
+use rusqlite::params;
+use rusqlite::Connection;
+use std::result::Result;
 
 pub enum Block {
     Tile(TileBlock),
@@ -40,8 +48,55 @@ pub struct Data {
     blocks: Vec<BlockData>,
 }
 
-#[tokio::main]
-async fn main() {
+// fn get_chunk(world: world, x: usize, y: usize) {}
+
+pub struct Chunk {
+    blocks: Vec<Block>,
+}
+
+pub enum Error {
+    InitDbError,
+    ChunkLoadError,
+}
+
+pub struct WorldDB {
+    connection: rusqlite::Connection,
+}
+
+impl WorldDB {
+    fn new(db_path: String) -> Result<Self, Error> {
+        if !Path::new(&db_path).exists() {
+            File::create(&db_path).map_err(|_| Error::InitDbError)?;
+        }
+
+        let connection = Connection::open(&db_path).map_err(|_| Error::InitDbError)?;
+
+        connection
+            .execute(
+                "CREATE TABLE IF NOT EXISTS blocks (
+                      id    INTEGER PRIMARY KEY,
+                      name  TEXT NOT NULL,
+                      age   INTEGER NOT NULL
+                      )",
+                (),
+            )
+            .map_err(|_| Error::InitDbError);
+
+        Ok(Self { connection })
+    }
+
+    fn load_chunk(self: &Self, x: i32, y: i32) -> Result<Chunk, Error> {
+        let it = self
+            .connection
+            .execute(
+                "SELECT id, x, y, data FROM chunks ORDER BY RANDOM() LIMIT ?1",
+                (),
+            )
+            .map_err(|_| Error::ChunkLoadError);
+    }
+}
+
+async fn start() {
     // Bind the TCP listener to the specified address
     let addr = "127.0.0.1:2567";
     let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
@@ -94,6 +149,7 @@ async fn main() {
                     println!("Serialized blocks:");
                     println!("{}", serialized);
 
+                    // write.send(Message::Binary(()))
                     write
                         .send(Message::Text(serialized))
                         .await
@@ -109,4 +165,9 @@ async fn main() {
             }
         });
     }
+}
+
+#[tokio::main]
+async fn main() {
+    let mut world_db = WorldDB::new("world.db");
 }
