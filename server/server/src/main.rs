@@ -14,6 +14,10 @@ use rusqlite::params;
 use rusqlite::Connection;
 use std::result::Result;
 
+use tokio::sync::mpsc;
+
+use nalgebra::Vector3;
+
 pub enum Block {
     Tile(TileBlock),
     Table(TableBlock),
@@ -110,89 +114,168 @@ impl WorldDB {
     }
 }
 
-async fn start(world_db: &mut WorldDB) {
-    let addr = "127.0.0.1:2567";
-    let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+async fn start(world_db: &mut WorldDB) {}
 
-    println!("Listening on: {}", addr);
+enum GameInfo {
+    Tick(EntitiesAroundPlayer),
+}
 
-    while let Ok((stream, _)) = listener.accept().await {
-        tokio::spawn(async move {
-            let ws_stream = accept_async(stream)
-                .await
-                .expect("Error during the websocket handshake");
+enum Entity {
+    Shop(ShopEntity),
+    OtherPlayer(OtherPlayerEntity),
+    OtherShip(OtherShipEntity),
+    NPC(NPCEntity),
+    Asteroid(AsteroidEntity),
+}
 
-            println!("New connection");
+struct ShopEntity {
+    height: u8,
+}
 
-            let (mut write, mut read) = ws_stream.split();
+struct OtherPlayerEntity {
+    vector_to_player: Vector3<f32>,
+    gender: bool,
+}
 
-            let mut blocks = Vec::new();
+struct OtherShipEntity {
+    vector_to_ship: Vector3<f32>,
+    kind: u16,
+}
 
-            let mut i = 0;
+struct NPCEntity {
+    vector_to_npc: Vector3<f32>,
+    kind: u16,
+}
 
-            while i < 100 {
-                blocks.push(Block::Tile(TileBlock { color: 0xffffffff }));
-                i = i + 1
-            }
+struct AsteroidEntity {
+    vector_to_asteroid: Vector3<f32>,
+    kind: u8,
+}
 
-            let mut data = Data::default();
+struct EntitiesAroundPlayer {
+    entities: Vec<Entity>,
+}
 
-            i = 0;
-            while i < blocks.len() {
-                match &blocks[i] {
-                    Block::Table(table) => data.blocks.push(BlockData {
-                        block_type: String::from_str("table").unwrap(),
-                        block_json: serde_json::to_string(&table).unwrap(),
-                        block_coords: Coords { x: i, y: 0, z: 0 },
-                    }),
-                    Block::Tile(tile) => data.blocks.push(BlockData {
-                        block_type: String::from_str("tile").unwrap(),
-                        block_json: serde_json::to_string(&tile).unwrap(),
-                        block_coords: Coords { x: i, y: 0, z: 0 },
-                    }),
+enum PlayerAction {
+    Move(MoveAction),
+}
+
+struct MoveAction {
+    up: bool,
+    down: bool,
+    forward: bool,
+    backward: bool,
+    left: bool,
+    right: bool,
+}
+
+struct EventLoop {
+    player_action_sender: mpsc::UnboundedSender<GameInfo>,
+    game_info_receiver: mpsc::UnboundedReceiver<GameInfo>,
+}
+
+pub struct SpaceBuildServer {
+    world_db: WorldDB,
+    player_action_receiver: mpsc::UnboundedReceiver<GameInfo>,
+    player_action_sender: mpsc::UnboundedSender<GameInfo>,
+    game_info_receiver: mpsc::UnboundedReceiver<GameInfo>,
+    game_info_sender: mpsc::UnboundedSender<GameInfo>,
+}
+
+impl SpaceBuildServer {
+    pub fn new(db_path: String) -> Result<Self, Error> {
+        let world_db = WorldDB::new(db_path)?;
+        let (player_action_sender, player_action_receiver) = mpsc::unbounded_channel();
+        let (game_info_sender, game_info_receiver) = mpsc::unbounded_channel();
+
+        Ok(Self {
+            world_db,
+            player_action_receiver,
+            player_action_sender,
+            game_info_receiver,
+            game_info_sender,
+        })
+    }
+
+    pub async fn start_game_loop() -> Result<(), Error> {
+        Ok(())
+    }
+
+    pub async fn start_network_loop(&self) -> Result<(), Error> {
+        let addr = "127.0.0.1:2567";
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+
+        println!("Listening on: {}", addr);
+
+        while let Ok((stream, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                let ws_stream = accept_async(stream)
+                    .await
+                    .expect("Error during the websocket handshake");
+
+                println!("New connection");
+
+                let (mut write, mut read) = ws_stream.split();
+
+                let mut blocks = Vec::new();
+
+                let mut i = 0;
+
+                while i < 100 {
+                    blocks.push(Block::Tile(TileBlock { color: 0xffffffff }));
+                    i = i + 1
                 }
-                i = i + 1;
-            }
 
-            let data_json = serde_json::to_string(&data);
+                let mut data = Data::default();
 
-            match data_json {
-                Ok(serialized) => {
-                    println!("Serialized blocks:");
-                    println!("{}", serialized);
-
-                    // write.send(Message::Binary(()))
-                    write
-                        .send(Message::Text(serialized))
-                        .await
-                        .expect("Failed to send message");
+                i = 0;
+                while i < blocks.len() {
+                    match &blocks[i] {
+                        Block::Table(table) => data.blocks.push(BlockData {
+                            block_type: String::from_str("table").unwrap(),
+                            block_json: serde_json::to_string(&table).unwrap(),
+                            block_coords: Coords { x: i, y: 0, z: 0 },
+                        }),
+                        Block::Tile(tile) => data.blocks.push(BlockData {
+                            block_type: String::from_str("tile").unwrap(),
+                            block_json: serde_json::to_string(&tile).unwrap(),
+                            block_coords: Coords { x: i, y: 0, z: 0 },
+                        }),
+                    }
+                    i = i + 1;
                 }
-                Err(err) => {
-                    eprintln!("Failed to serialize blocks: {}", err);
-                }
-            }
 
-            while let Some(Ok(msg)) = read.next().await {
-                println!("Received a message from client: {:?}", msg);
-            }
-        });
+                let data_json = serde_json::to_string(&data);
+
+                match data_json {
+                    Ok(serialized) => {
+                        println!("Serialized blocks:");
+                        println!("{}", serialized);
+
+                        // write.send(Message::Binary(()))
+                        write
+                            .send(Message::Text(serialized))
+                            .await
+                            .expect("Failed to send message");
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to serialize blocks: {}", err);
+                    }
+                }
+
+                while let Some(Ok(msg)) = read.next().await {
+                    println!("Received a message from client: {:?}", msg);
+                }
+            });
+        }
+        Ok(())
     }
 }
 
-struct Game
-{
-
-}
-
-impl Game
-{
-    pub fn start()
-}
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let mut world_db = WorldDB::new(String::from_str("world.db").unwrap())?;
+    let game = SpaceBuildServer::new(String::from_str("world.db").unwrap())?;
 
-    start(&mut world_db);
-
+    tokio::try_join!(game.start_network_loop(), game.start_game_loop())?;
     Ok(())
 }
