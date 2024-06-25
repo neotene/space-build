@@ -179,6 +179,15 @@ async fn start(world_db: &mut WorldDB) {
     }
 }
 
+struct Game
+{
+
+}
+
+impl Game
+{
+    pub fn start()
+}
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let mut world_db = WorldDB::new(String::from_str("world.db").unwrap())?;
