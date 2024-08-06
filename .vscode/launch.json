@@ -4,16 +4,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'server'",
+            "name": "Debug unit tests in library 'space_build'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=server"
+                    "--package=space-build"
                 ],
                 "filter": {
-                    "name": "server",
+                    "name": "space_build",
                     "kind": "lib"
                 }
             },
@@ -28,7 +28,7 @@
                 "args": [
                     "build",
                     "--bin=server",
-                    "--package=server"
+                    "--package=space-build"
                 ],
                 "filter": {
                     "name": "server",
@@ -47,7 +47,7 @@
                     "test",
                     "--no-run",
                     "--bin=server",
-                    "--package=server"
+                    "--package=space-build"
                 ],
                 "filter": {
                     "name": "server",
@@ -60,15 +60,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'cli-client'",
+            "name": "Debug executable 'test_client'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=cli-client",
-                    "--package=cli-client"
+                    "--bin=test_client",
+                    "--package=space-build"
                 ],
                 "filter": {
-                    "name": "cli-client",
+                    "name": "test_client",
                     "kind": "bin"
                 }
             },
@@ -78,16 +78,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'cli-client'",
+            "name": "Debug unit tests in executable 'test_client'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=cli-client",
-                    "--package=cli-client"
+                    "--bin=test_client",
+                    "--package=space-build"
                 ],
                 "filter": {
-                    "name": "cli-client",
+                    "name": "test_client",
                     "kind": "bin"
                 }
             },

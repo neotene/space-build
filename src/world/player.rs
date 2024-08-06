@@ -3,7 +3,7 @@ use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Player {
     pub coords: Vector3<SystemCoordsRepr>,
     pub nickname: String,

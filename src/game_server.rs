@@ -12,8 +12,10 @@ use nalgebra::Vector3;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_tungstenite::{accept_async, WebSocketStream};
+use tracing::Level;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -36,21 +38,26 @@ pub enum ClientMessage {
 type WsReader = SplitStream<WebSocketStream<TcpStream>>;
 type WsWriter = SplitSink<WebSocketStream<TcpStream>, Message>;
 
-pub struct SpaceBuildGame {
+pub struct GameServer {
     galaxy: Galaxy,
     writers: HashMap<Uuid, WsWriter>,
     prompt: String,
+    interrupt_receiver: Receiver<()>,
 }
 
-impl SpaceBuildGame {
-    pub fn new() -> Result<Self> {
+impl GameServer {
+    pub fn new() -> Result<(Sender<()>, Self)> {
         let galaxy = Galaxy::new("space-build".to_string())?;
-
-        Ok(Self {
-            galaxy,
-            writers: HashMap::new(),
-            prompt: String::default(),
-        })
+        let (interrupt_sender, interrupt_receiver) = mpsc::channel(1);
+        Ok((
+            interrupt_sender,
+            Self {
+                galaxy,
+                writers: HashMap::new(),
+                prompt: String::default(),
+                interrupt_receiver,
+            },
+        ))
     }
 
     async fn next_message(reader: &mut WsReader) -> Result<ClientMessage> {
@@ -164,7 +171,7 @@ impl SpaceBuildGame {
         self.galaxy.players.remove(&uuid);
     }
 
-    pub async fn run_loop(&mut self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         self.galaxy.load_all()?;
 
         let ref_instant = tokio::time::Instant::now();
@@ -180,9 +187,24 @@ impl SpaceBuildGame {
         let mut tick_delay = tokio::time::interval(std::time::Duration::from_millis(250));
         let mut write_delay = tokio::time::interval(std::time::Duration::from_millis(250));
 
-        tracing::info!("Started");
+        let subscriber = tracing_subscriber::fmt()
+            .with_timer(tracing_subscriber::fmt::time::uptime())
+            .with_max_level(Level::INFO)
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber).map_err(|_| Error::TracingError)?;
+
+        tracing::trace!("Started");
         loop {
             tokio::select! {
+                // ----------------------------------------------------
+                // ------------------ON INTERRUPT----------------------
+                // ----------------------------------------------------
+                interrupt = self.interrupt_receiver.recv() => {
+                    if interrupt.is_some() {
+                        return Ok(());
+                    }
+                }
                 // ----------------------------------------------------
                 // ------------------ON TICK---------------------------
                 // ----------------------------------------------------
