@@ -23,6 +23,27 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug unit tests in library 'space_build' with no-crossterm",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=space-build",
+                    "-F",
+                    "no-crossterm",
+                ],
+                "filter": {
+                    "name": "space_build",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug executable 'server'",
             "cargo": {
                 "args": [
@@ -41,48 +62,10 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'server'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=server",
-                    "--package=space-build"
-                ],
-                "filter": {
-                    "name": "server",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
             "name": "Debug executable 'test_client'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=test_client",
-                    "--package=space-build"
-                ],
-                "filter": {
-                    "name": "test_client",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'test_client'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
                     "--bin=test_client",
                     "--package=space-build"
                 ],

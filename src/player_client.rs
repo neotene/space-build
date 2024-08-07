@@ -22,7 +22,7 @@ pub struct PlayerClient {
 }
 
 impl PlayerClient {
-    pub async fn connect(host: String) -> Result<PlayerClient> {
+    pub async fn connect(host: &str) -> Result<PlayerClient> {
         let (ws_stream, _) = connect_async(host)
             .await
             .map_err(|err| Error::WebSocketError(err))?;

@@ -15,7 +15,7 @@ pub struct Galaxy {
 }
 
 impl Galaxy {
-    pub fn new(db_name: String) -> Result<Self> {
+    pub fn new(db_name: &str) -> Result<Self> {
         let client =
             redis::Client::open("redis://127.0.0.1/").map_err(|_| Error::RedisOpenError)?;
         let connection = client
@@ -26,7 +26,7 @@ impl Galaxy {
             connection,
             systems: HashMap::new(),
             players: HashMap::new(),
-            db_name,
+            db_name: db_name.to_string(),
             rotation_speed: 1.,
         })
     }

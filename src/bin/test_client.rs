@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let mut player = PlayerClient::connect("ws://127.0.0.1:2567".to_string()).await?;
+    let mut player = PlayerClient::connect("ws://127.0.0.1:2567").await?;
 
     player.login("test_player".to_string()).await?;
 

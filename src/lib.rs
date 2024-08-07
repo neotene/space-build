@@ -69,7 +69,7 @@ mod tests_galaxy {
     #[test]
     #[serial]
     fn test_01_clear_db() -> anyhow::Result<()> {
-        let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+        let mut galaxy = Galaxy::new("space_build_tests")?;
 
         let client = redis::Client::open("redis://127.0.0.1/")?;
         let mut conn = client.get_connection()?;
@@ -94,7 +94,7 @@ mod tests_galaxy {
     #[test]
     #[serial]
     fn test_02_add_system() -> anyhow::Result<()> {
-        let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+        let mut galaxy = Galaxy::new("space_build_tests")?;
         galaxy.clear_db()?;
         let uuid = galaxy.add_system(get_test_system_1());
         assert!(galaxy.systems.contains_key(&uuid));
@@ -121,7 +121,7 @@ mod tests_galaxy {
     #[test]
     #[serial]
     fn test_03_save_systems() -> anyhow::Result<()> {
-        let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+        let mut galaxy = Galaxy::new("space_build_tests")?;
         galaxy.clear_db()?;
         let system = get_test_system_1();
         let uuid = galaxy.add_system(system);
@@ -164,13 +164,13 @@ mod tests_galaxy {
         let uuid: Uuid;
 
         {
-            let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+            let mut galaxy = Galaxy::new("space_build_tests")?;
             galaxy.clear_db()?;
             uuid = galaxy.add_system(system.clone());
             galaxy.save_systems()?;
         }
 
-        let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+        let mut galaxy = Galaxy::new("space_build_tests")?;
 
         galaxy.load_systems()?;
 
@@ -204,7 +204,7 @@ mod tests_galaxy {
     #[test]
     #[serial]
     fn test_05_add_player() -> anyhow::Result<()> {
-        let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+        let mut galaxy = Galaxy::new("space_build_tests")?;
         galaxy.clear_db()?;
         let uuid = galaxy.add_player(get_test_player_1());
         assert!(galaxy.players.contains_key(&uuid));
@@ -227,7 +227,7 @@ mod tests_galaxy {
     #[test]
     #[serial]
     fn test_06_save_players() -> anyhow::Result<()> {
-        let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+        let mut galaxy = Galaxy::new("space_build_tests")?;
         galaxy.clear_db()?;
 
         let player1 = get_test_player_1();
@@ -288,7 +288,7 @@ mod tests_galaxy {
         let player2 = get_test_player_2();
 
         {
-            let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+            let mut galaxy = Galaxy::new("space_build_tests")?;
             galaxy.clear_db()?;
 
             uuid1 = galaxy.add_player(player1.clone());
@@ -297,7 +297,7 @@ mod tests_galaxy {
             galaxy.save_players()?;
         }
 
-        let mut galaxy = Galaxy::new("space_build_tests".to_string())?;
+        let mut galaxy = Galaxy::new("space_build_tests")?;
 
         assert_eq!(0, galaxy.players.len());
         galaxy.load_player_by_nickname("test_nick1".to_string())?;
@@ -337,12 +337,12 @@ mod tests_gameserver {
     #[tokio::test]
     #[serial]
     async fn test_08_all() -> anyhow::Result<()> {
-        let (tx, mut game_server) = GameServer::new()?;
+        let (tx, mut game_server) = GameServer::new(Galaxy::new("space_build_tests")?);
         let game_thread = tokio::spawn(async move { game_server.run().await });
 
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        let mut player = PlayerClient::connect("ws://127.0.0.1:2567".to_string()).await?;
+        let mut player = PlayerClient::connect("ws://127.0.0.1:2567").await?;
         player.login("test".to_string()).await?;
 
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;

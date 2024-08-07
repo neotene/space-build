@@ -17,6 +17,9 @@ doctest = false
 name = "space_build"
 doctest = false
 
+[features]
+no-crossterm = []
+
 [dependencies]
 crossterm = {version = "0.28.1", features = ["event-stream"]}
 tokio = { version = "1.37.0", features = ["full"] }

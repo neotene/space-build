@@ -5,6 +5,7 @@ use crate::world::player::Player;
 use crate::world::system::{CenterType, System};
 use crate::world::temporal::Temporal;
 use crate::{Error, GalaxyCoordsRepr, GalaxyOffsetRepr, Result};
+#[cfg(not(feature = "no-crossterm"))]
 use crossterm::event::{Event, EventStream, KeyCode};
 use futures::stream::{FuturesUnordered, SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
@@ -17,6 +18,40 @@ use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_tungstenite::{accept_async, WebSocketStream};
 use tracing::Level;
 use uuid::Uuid;
+
+#[cfg(not(feature = "no-crossterm"))]
+async fn crossterm_wrapper_next(prompt: &mut String, crossterm_events: &mut EventStream) {
+    let event = crossterm_events.next().await.unwrap().unwrap();
+    tracing::trace!("=> On term event");
+    match event {
+        Event::Key(key) => match key.code {
+            KeyCode::Char(c) => {
+                *prompt = format!("{}{}", prompt, c.to_string());
+            }
+            KeyCode::Enter => {
+                if prompt == "help" {
+                    println!("Commands:");
+                    println!("\tdatas\t\t(print all datas)");
+                } else if prompt == "datas" {
+                    // println!("ws_accept_futs size:\t\t{}", ws_accept_futs.len());
+                    // println!("first_read_futs size:\t\t{}", first_read_futs.len());
+                    // println!("read_futs size:\t\t\t{}", read_futs.len());
+                    // println!("writers size:\t\t\t{}", self.writers.len());
+                } else {
+                    println!("Unkown command {}", prompt);
+                }
+                *prompt = "".to_string();
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
+#[cfg(feature = "no-crossterm")]
+async fn crossterm_wrapper_next(_: &mut String, _: &mut String) {
+    tokio::time::sleep(tokio::time::Duration::from_nanos(1)).await;
+}
 
 #[derive(Clone)]
 pub enum PlayerAction {
@@ -41,23 +76,20 @@ type WsWriter = SplitSink<WebSocketStream<TcpStream>, Message>;
 pub struct GameServer {
     galaxy: Galaxy,
     writers: HashMap<Uuid, WsWriter>,
-    prompt: String,
     interrupt_receiver: Receiver<()>,
 }
 
 impl GameServer {
-    pub fn new() -> Result<(Sender<()>, Self)> {
-        let galaxy = Galaxy::new("space-build".to_string())?;
+    pub fn new(galaxy: Galaxy) -> (Sender<()>, Self) {
         let (interrupt_sender, interrupt_receiver) = mpsc::channel(1);
-        Ok((
+        (
             interrupt_sender,
             Self {
                 galaxy,
                 writers: HashMap::new(),
-                prompt: String::default(),
                 interrupt_receiver,
             },
-        ))
+        )
     }
 
     async fn next_message(reader: &mut WsReader) -> Result<ClientMessage> {
@@ -176,7 +208,11 @@ impl GameServer {
 
         let ref_instant = tokio::time::Instant::now();
 
+        #[cfg(not(feature = "no-crossterm"))]
         let mut crossterm_events = EventStream::new();
+        #[cfg(feature = "no-crossterm")]
+        let mut crossterm_events = String::new();
+        let mut prompt: String = String::new();
 
         let addr = "127.0.0.1:2567";
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
@@ -204,7 +240,7 @@ impl GameServer {
                     if interrupt.is_some() {
                         return Ok(());
                     }
-                }
+                },
                 // ----------------------------------------------------
                 // ------------------ON TICK---------------------------
                 // ----------------------------------------------------
@@ -243,40 +279,7 @@ impl GameServer {
                 // ----------------------------------------------------
                 // ---------------ON TERM EVENT------------------------
                 // ----------------------------------------------------
-                Some(maybe_event) = crossterm_events.next() => {
-                    tracing::trace!("=> On term event");
-                    match maybe_event {
-                        Err(err) => tracing::warn!("Crossterm event error: {err}"),
-                        Ok(event) => {
-                            match event {
-                                Event::Key(key) => {
-                                    match key.code {
-                                        KeyCode::Char(c) => {
-                                            self.prompt = format!("{}{}", self.prompt, c.to_string());
-                                        },
-                                        KeyCode::Enter => {
-                                            if self.prompt == "help" {
-                                                println!("Commands:");
-                                                println!("\tdatas\t\t(print all datas)");
-                                            } else if self.prompt == "datas" {
-                                                println!("ws_accept_futs size:\t\t{}", ws_accept_futs.len());
-                                                println!("first_read_futs size:\t\t{}", first_read_futs.len());
-                                                println!("read_futs size:\t\t\t{}", read_futs.len());
-                                                println!("writers size:\t\t\t{}", self.writers.len());
-                                            } else {
-                                                println!("Unkown command {}", self.prompt);
-                                            }
-                                            self.prompt = "".to_string();
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                _ => {}
-                            }
-                        },
-
-                    }
-                }
+                _ = crossterm_wrapper_next(&mut prompt, &mut crossterm_events) => {},
                 // ----------------------------------------------------
                 // --------------ON FLUSH TIMER------------------------
                 // ----------------------------------------------------
@@ -288,7 +291,7 @@ impl GameServer {
                             Ok(_result) => {},
                         }
                     }
-                }
+                },
                 // ----------------------------------------------------
                 // ---------------ON TCP ACCEPT------------------------
                 // ----------------------------------------------------
